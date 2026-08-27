@@ -199,8 +199,18 @@ class ScannerApp(WINDOW_BASE):
 
         phase1 = ttk.LabelFrame(controls, text="Stage 1 candidate scan", padding=12)
         phase1.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        phase1.columnconfigure(1, weight=1)
         phase2 = ttk.LabelFrame(controls, text="Stage 2 validation and speed", padding=12)
         phase2.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ttk.Label(phase1, text="Specific IPs/CIDRs (comma-separated, optional)").grid(
+            row=0, column=0, sticky="w", padx=(0, 10), pady=3
+        )
+        ttk.Entry(phase1, textvariable=self.specific_targets).grid(
+            row=0, column=1, sticky="ew", pady=3
+        )
+        ttk.Button(phase1, text="Start Target Test", command=self.start_target_test).grid(
+            row=0, column=2, sticky="w", padx=(8, 0), pady=3
+        )
         self._add_grid_fields(
             phase1,
             [
@@ -211,19 +221,20 @@ class ScannerApp(WINDOW_BASE):
                 ("Neighbor /24 radius", self.neighbor_radius),
                 ("Max latency for clean (ms)", self.phase1_latency),
             ],
+            start_row=1,
         )
         ttk.Checkbutton(
             phase1,
             text="Check that traffic is not exiting from a known VPN/server IP",
             variable=self.direct_egress,
-        ).grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
             phase1,
             text="Fast local mode (use only when not on VPN/TUN/proxy)",
             variable=self.local_fast,
-        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Button(phase1, text="Advanced Settings", command=self.open_advanced_settings).grid(
-            row=8, column=0, columnspan=2, sticky="w", pady=(8, 0)
+            row=9, column=0, columnspan=2, sticky="w", pady=(8, 0)
         )
 
         ttk.Checkbutton(
@@ -575,6 +586,15 @@ class ScannerApp(WINDOW_BASE):
             messagebox.showerror("Invalid setting", str(exc))
             return
         self._launch_scan(args, f"Scanning into {self.active_output_dir.name}...")
+
+    def start_target_test(self) -> None:
+        if not self.specific_targets.get().strip():
+            messagebox.showinfo(
+                "Target required",
+                "Enter one IPv4 address or CIDR, or several separated by commas.",
+            )
+            return
+        self.start_scan()
 
     def update_xray_core(self) -> None:
         """Download the latest official Xray core without freezing the GUI."""
