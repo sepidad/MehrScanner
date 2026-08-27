@@ -2,6 +2,13 @@
 
 MehrScanner is a small learning project for carefully testing a small number of candidate IPs for a VLESS-over-TLS profile.
 
+When it generates candidates automatically, it fetches the current IPv4
+prefixes announced by Cloudflare's AS13335 from the RIPE NCC routing data.
+This includes Cloudflare-announced ranges that are not present in the smaller
+shared-proxy list, such as some `/24` prefixes. If that lookup is unavailable,
+it falls back to Cloudflare's official shared-proxy list and then to a built-in
+copy of that list. The scanner currently generates IPv4 candidates only.
+
 It is written from scratch and intentionally keeps the first version easy to understand. It does not copy the other scanner.
 
 ## Requirements and installation

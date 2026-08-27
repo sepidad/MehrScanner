@@ -39,6 +39,13 @@ from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 
 CLOUDFLARE_IPV4_URL = "https://www.cloudflare.com/ips-v4"
+# Cloudflare announces additional service/BYOIP prefixes through AS13335.
+# The BGP list includes ranges such as 8.6.112.0/24 that are not in the
+# smaller shared-proxy list above.
+CLOUDFLARE_BGP_IPV4_URL = (
+    "https://stat.ripe.net/data/announced-prefixes/data.json"
+    "?resource=AS13335&min_peers_seeing=1"
+)
 XRAY_LATEST_RELEASE_API = "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
 DEFAULT_TIMEOUT = 2.5
 DEFAULT_CONCURRENCY = 64
@@ -275,25 +282,49 @@ def first_query_value(query: dict[str, list[str]], key: str) -> str | None:
 
 
 def fetch_cloudflare_ipv4_ranges() -> tuple[list[ipaddress.IPv4Network], str]:
-    request = Request(
-        CLOUDFLARE_IPV4_URL,
-        headers={
-            "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
-            "Accept": "text/plain,*/*",
-        },
-    )
+    headers = {
+        "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
+        "Accept": "application/json,text/plain,*/*",
+    }
+    official_ranges: list[ipaddress.IPv4Network] = []
     try:
+        request = Request(CLOUDFLARE_IPV4_URL, headers=headers)
         with open_url(request, 10) as response:
             text = response.read().decode("utf-8")
-        ranges = [
+        official_ranges = [
             ipaddress.IPv4Network(item.strip()) for item in text.split() if item.strip()
         ]
-        if ranges:
-            return ranges, CLOUDFLARE_IPV4_URL
     except Exception as exc:
         print(
-            f"Warning: could not fetch Cloudflare ranges live ({type(exc).__name__}). Using built-in fallback list."
+            f"Warning: could not fetch the official Cloudflare list ({type(exc).__name__})."
         )
+
+    # Use current BGP announcements as the broad candidate source. This is
+    # intentionally separate from Cloudflare's smaller shared-proxy list:
+    # AS13335 announces additional prefixes used by other Cloudflare services
+    # and BYOIP customers.
+    try:
+        request = Request(CLOUDFLARE_BGP_IPV4_URL, headers=headers)
+        with open_url(request, 15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        announced = payload.get("data", {}).get("prefixes", [])
+        ranges = sorted(
+            {
+                ipaddress.IPv4Network(item["prefix"], strict=False)
+                for item in announced
+                if isinstance(item, dict) and ":" not in str(item.get("prefix", ""))
+            },
+            key=lambda network: (int(network.network_address), network.prefixlen),
+        )
+        if ranges:
+            return ranges, "current AS13335 BGP announcements (RIPE NCC)"
+    except Exception as exc:
+        print(
+            f"Warning: could not fetch current AS13335 announcements ({type(exc).__name__})."
+        )
+
+    if official_ranges:
+        return official_ranges, CLOUDFLARE_IPV4_URL
 
     return [
         ipaddress.IPv4Network(item) for item in FALLBACK_CLOUDFLARE_IPV4_RANGES
