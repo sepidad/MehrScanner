@@ -52,6 +52,28 @@ THEMES = [
 ]
 DARK_THEMES = {"darkly", "superhero", "vapor", "solar", "cyborg"}
 
+PERSIAN_UI = {
+    "Previous scans": "اسکن‌های قبلی", "Rescan": "اسکن دوباره", "Refresh": "تازه‌سازی", "Delete": "حذف",
+    "Stage 1 finds candidates. Stage 2 validates the tunnel and measures download/upload.": "مرحله اول کاندیداها را پیدا می‌کند؛ مرحله دوم تونل را تأیید و دانلود/آپلود را اندازه‌گیری می‌کند.",
+    "Stage 1 candidate scan": "اسکن کاندیدا - مرحله اول", "Stage 2 validation and speed": "اعتبارسنجی و سرعت - مرحله دوم",
+    "Specific IPs/CIDRs (comma-separated, optional)": "IP یا CIDR مشخص (با کاما جدا شود)",
+    "Parallel checks": "بررسی هم‌زمان", "Candidates per batch": "کاندیدا در هر دسته",
+    "Stop after clean hits": "توقف پس از IPهای سالم", "Timeout (seconds)": "مهلت (ثانیه)",
+    "Neighbor /24 radius": "شعاع همسایه /24", "Max latency for clean (ms)": "حداکثر تأخیر IP سالم (میلی‌ثانیه)",
+    "Check that traffic is not exiting from a known VPN/server IP": "بررسی عدم خروج ترافیک از IP شناخته‌شده VPN/سرور",
+    "Fast local mode (use only when not on VPN/TUN/proxy)": "حالت سریع محلی (فقط بدون VPN/TUN/پروکسی)",
+    "Advanced Settings": "تنظیمات پیشرفته", "Start Target Test": "شروع تست هدف",
+    "Run Stage 2 validation": "اجرای اعتبارسنجی مرحله دوم", "Fast mode: validate early clean IPs while Stage 1 scans": "حالت سریع: اعتبارسنجی IPهای سالم هم‌زمان با مرحله اول",
+    "Phase 1 clean IPs": "IPهای سالم مرحله اول", "Validated candidates": "کاندیداهای تأییدشده",
+    "Copy Selected IPs": "کپی IPهای انتخاب‌شده", "Copy All Clean IPs": "کپی همه IPهای سالم", "Copy Selected Configs": "کپی کانفیگ‌های انتخاب‌شده", "Copy All Configs": "کپی همه کانفیگ‌ها",
+    "Select Top 20 Best": "انتخاب ۲۰ مورد برتر", "Re-run Stage 2": "اجرای دوباره مرحله دوم",
+    "Start Scan": "شروع اسکن", "Stop Stage 1": "توقف مرحله اول", "Stop Stage 2": "توقف مرحله دوم", "Stop Both": "توقف هر دو",
+    "Open Results Folder": "باز کردن پوشه نتایج", "Reset Results": "حذف نتایج", "Live scanner log": "گزارش زنده اسکن",
+    "VLESS configuration": "کانفیگ VLESS", "Scan": "اسکن", "Safety and Output": "امنیت و خروجی", "Xray": "Xray", "Close": "بستن",
+    "Update Xray Core": "به‌روزرسانی هسته Xray", "Allow automatic Xray download": "اجازه دانلود خودکار Xray",
+    "Download URL": "آدرس دانلود", "Upload URL": "آدرس آپلود", "Validation URL": "آدرس اعتبارسنجی",
+}
+
 
 def parse_specific_targets(raw: str) -> list[str]:
     """Validate and normalize comma-separated IPv4 addresses or networks."""
@@ -89,6 +111,7 @@ class ScannerApp(WINDOW_BASE):
         self.selected_scan = tk.StringVar()
         self.config_text = tk.StringVar(value=self.settings.get("last_config", ""))
         self.theme_name = tk.StringVar(value=self.settings.get("theme", "flatly"))
+        self.language = tk.StringVar(value=self.settings.get("language", "en"))
         self.concurrency = tk.StringVar(value="64")
         self.candidate_limit = tk.StringVar(value="200")
         self.stop_after_hits = tk.StringVar(value="10000")
@@ -133,6 +156,7 @@ class ScannerApp(WINDOW_BASE):
         self.auto_install_xray = tk.BooleanVar(value=True)
         self.status_text = tk.StringVar(value="Ready. Paste a VLESS config and start the scan.")
         self._build_ui()
+        self._apply_language()
         self.config_text.trace_add("write", self._on_config_changed)
         self.selected_scan.trace_add("write", self._on_scan_selected)
         self.protocol("WM_DELETE_WINDOW", self.close_app)
@@ -173,6 +197,11 @@ class ScannerApp(WINDOW_BASE):
         self.theme_selector.bind("<<ComboboxSelected>>", self._on_theme_selected)
         if not HAS_BOOTSTRAP:
             self.theme_selector.configure(state="disabled")
+        self.language_selector = ttk.Combobox(
+            header, textvariable=self.language, state="readonly", values=("en", "fa"), width=8
+        )
+        self.language_selector.grid(row=1, column=1, sticky="e", pady=(4, 0))
+        self.language_selector.bind("<<ComboboxSelected>>", lambda _event: self._apply_language())
 
         config_frame = ttk.LabelFrame(self, text="VLESS configuration", padding=12)
         config_frame.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 10))
@@ -481,6 +510,7 @@ class ScannerApp(WINDOW_BASE):
             row=2, column=0, sticky="w", pady=(12, 0)
         )
         ttk.Button(window, text="Close", command=window.destroy).grid(row=1, column=0, sticky="e", padx=12, pady=(0, 12))
+        self._apply_language(window, save=False)
 
     @staticmethod
     def _load_settings() -> dict[str, str]:
@@ -496,11 +526,34 @@ class ScannerApp(WINDOW_BASE):
         data = {
             "last_config": self.config_text.get().strip(),
             "theme": self._validated_theme(),
+            "language": self.language.get(),
         }
         try:
             SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=True, indent=2), encoding="utf-8")
         except OSError:
             pass
+
+    def _apply_language(self, root: tk.Misc | None = None, save: bool = True) -> None:
+        """Translate visible static controls; scanner data and config values stay unchanged."""
+        root = root or self
+        translations = PERSIAN_UI if self.language.get() == "fa" else {value: key for key, value in PERSIAN_UI.items()}
+        if root is self:
+            self.title("MehrScanner" if self.language.get() != "fa" else "مهر اسکنر")
+        for widget in root.winfo_children():
+            try:
+                current = widget.cget("text")
+                if current in translations:
+                    widget.configure(text=translations[current])
+            except (tk.TclError, TypeError):
+                pass
+            if isinstance(widget, ttk.Notebook):
+                for tab_id in widget.tabs():
+                    tab_text = widget.tab(tab_id, "text")
+                    if tab_text in translations:
+                        widget.tab(tab_id, text=translations[tab_text])
+            self._apply_language(widget, save=False)
+        if save:
+            self._save_settings()
 
     def _styled_button(
         self,
