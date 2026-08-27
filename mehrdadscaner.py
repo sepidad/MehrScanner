@@ -1867,6 +1867,8 @@ def run_xray_stage2(
                     0,
                     type(exc).__name__,
                 )
+            if validation.error == "stage2_stopped" or (should_stop and should_stop()):
+                continue
             validated.append(validation)
             marker = "OK" if validation.ok else "--"
             print(
@@ -1967,6 +1969,8 @@ class XrayStage2Pipeline:
                 0,
                 type(exc).__name__,
             )
+        if validation.error == "stage2_stopped" or (self.should_stop and self.should_stop()):
+            return
         with self.lock:
             self.validations.append(validation)
             snapshot = list(self.validations)
@@ -1986,6 +1990,10 @@ class XrayStage2Pipeline:
         )
 
     def finish(self) -> list[XrayValidationResult]:
+        if self.should_stop and self.should_stop():
+            for future in list(self.futures):
+                if not future.done():
+                    future.cancel()
         self.executor.shutdown(wait=True)
         with self.lock:
             validations = sort_xray_results(self.validations)

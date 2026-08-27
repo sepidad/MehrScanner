@@ -108,6 +108,7 @@ class ScannerApp(WINDOW_BASE):
         self.phase1_rows: list[dict[str, str]] = []
         self.stage2_rows: list[dict[str, str]] = []
         self._stage2_iids: list[str] = []
+        self._stage2_stop_requested = False
         self.selected_scan = tk.StringVar()
         self.config_text = tk.StringVar(value=self.settings.get("last_config", ""))
         self.theme_name = tk.StringVar(value=self.settings.get("theme", "flatly"))
@@ -703,6 +704,7 @@ class ScannerApp(WINDOW_BASE):
         self.stop_stage2_button.configure(state="normal" if self.run_stage2.get() else "disabled")
         self.stop_all_button.configure(state="normal")
         self._stage1_stopped = False  # Track Stage 1 completion
+        self._stage2_stop_requested = False
         python_executable = self._scanner_python()
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
@@ -1015,6 +1017,7 @@ class ScannerApp(WINDOW_BASE):
             self.stop_stage1_button.configure(state="disabled")
             self.status_text.set("Stopping Stage 1. Keeping clean IPs found so far.")
         else:
+            self._stage2_stop_requested = True
             self.stop_stage2_button.configure(state="disabled")
             self.status_text.set("Stopping Stage 2. Keeping completed validations.")
 
@@ -1142,6 +1145,8 @@ class ScannerApp(WINDOW_BASE):
             self._append_log(f"Could not load phase 1 results: {exc}\n")
 
     def _load_stage2_results(self) -> None:
+        if self._stage2_stop_requested:
+            return
         # Preserve current selection by IP
         selected_ips = {self.results.item(item, "values")[1] for item in self.results.selection()}
         
@@ -1154,7 +1159,8 @@ class ScannerApp(WINDOW_BASE):
         try:
             with path.open("r", encoding="utf-8", newline="") as handle:
                 for row in csv.DictReader(handle):
-                    self.stage2_rows.append(row)
+                    if self._stage2_row_is_useful(row):
+                        self.stage2_rows.append(row)
             self._render_stage2_rows(self.stage2_rows)
             
             # Restore selection
@@ -1187,7 +1193,7 @@ class ScannerApp(WINDOW_BASE):
         for row in self.results.get_children():
             self.results.delete(row)
         self._stage2_iids = []
-        for index, row in enumerate(rows, start=1):
+        for index, row in enumerate((row for row in rows if self._stage2_row_is_useful(row)), start=1):
             iid = f"stage2-{index}"
             self._stage2_iids.append(iid)
             self.results.insert(
@@ -1206,6 +1212,19 @@ class ScannerApp(WINDOW_BASE):
                     self._format_stage2_details(row.get("error", "")),
                 ),
             )
+
+    @staticmethod
+    def _stage2_row_is_useful(row: dict[str, str]) -> bool:
+        """Show only successful validations with a practical latency."""
+        if row.get("ok", "").strip().lower() != "true":
+            return False
+        if "timeout" in row.get("error", "").lower():
+            return False
+        try:
+            latency = float(row.get("latency_ms", ""))
+        except (TypeError, ValueError):
+            return False
+        return latency <= 2000
 
     def copy_selected_phase1(self) -> None:
         items = self.phase1_results.selection()
