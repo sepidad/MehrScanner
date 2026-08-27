@@ -4,6 +4,23 @@ MehrScanner is a small learning project for carefully testing a small number of 
 
 It is written from scratch and intentionally keeps the first version easy to understand. It does not copy the other scanner.
 
+## Requirements and installation
+
+MehrScanner requires Windows and Python 3.10 or newer. The standard Python
+Windows installer includes the Tkinter library used by the graphical app.
+
+After downloading or cloning the project, install the optional enhanced GUI
+theme with:
+
+```powershell
+py -3 -m pip install -r requirements.txt
+```
+
+The scanner still runs without this optional package; the GUI will use plain
+Tkinter instead. You do not need to install Xray manually. If Stage 2 Xray
+validation is enabled and Xray is not already present, MehrScanner downloads
+the official Windows release into the local `tools\xray` folder.
+
 ## What it checks
 
 For each candidate IP and port, it performs three checks:
