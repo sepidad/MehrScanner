@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MehrdadScaner - a small Cloudflare candidate IP scanner.
+MehrScanner - a small Cloudflare candidate IP scanner.
 
 This tool is intentionally simple:
 1. Parse a VLESS URL and keep its SNI/Host/path settings.
@@ -278,7 +278,7 @@ def fetch_cloudflare_ipv4_ranges() -> tuple[list[ipaddress.IPv4Network], str]:
     request = Request(
         CLOUDFLARE_IPV4_URL,
         headers={
-            "User-Agent": "Mozilla/5.0 MehrdadScaner/1.0",
+            "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
             "Accept": "text/plain,*/*",
         },
     )
@@ -311,7 +311,7 @@ def detect_public_egress_ip(timeout: float = 6.0, prefer_v4: bool = True) -> str
             request = Request(
                 url,
                 headers={
-                    "User-Agent": "Mozilla/5.0 MehrdadScaner/1.0",
+                    "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
                     "Accept": "text/plain,*/*",
                 },
             )
@@ -1070,7 +1070,7 @@ async def time_websocket_upgrade(
             "Connection: Upgrade\r\n"
             f"Sec-WebSocket-Key: {key}\r\n"
             "Sec-WebSocket-Version: 13\r\n"
-            "User-Agent: MehrdadScaner/1.0\r\n"
+            "User-Agent: MehrScanner/1.0\r\n"
             "\r\n"
         )
         writer.write(request.encode("ascii"))
@@ -1103,7 +1103,7 @@ async def time_http_request(
         request = (
             f"GET / HTTP/1.1\r\n"
             f"Host: {host}\r\n"
-            "User-Agent: MehrdadScaner/1.0\r\n"
+            "User-Agent: MehrScanner/1.0\r\n"
             "Connection: close\r\n"
             "\r\n"
         )
@@ -1502,7 +1502,7 @@ def read_json_url(url: str) -> dict:
     request = Request(
         url,
         headers={
-            "User-Agent": "Mozilla/5.0 MehrdadScaner/1.0",
+            "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
             "Accept": "application/json",
         },
     )
@@ -1511,7 +1511,7 @@ def read_json_url(url: str) -> dict:
 
 
 def download_file(url: str, target: Path) -> None:
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0 MehrdadScaner/1.0"})
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 MehrScanner/1.0"})
     with open_url(request, 60) as response, target.open("wb") as handle:
         shutil.copyfileobj(response, handle)
 
@@ -1708,7 +1708,7 @@ def fetch_through_http_proxy(
 ) -> tuple[float, int]:
     proxy_url = f"http://127.0.0.1:{local_port}"
     opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
-    request = Request(test_url, headers={"User-Agent": "Mozilla/5.0 MehrdadScaner/1.0"})
+    request = Request(test_url, headers={"User-Agent": "Mozilla/5.0 MehrScanner/1.0"})
     start = time.perf_counter()
     with opener.open(request, timeout=timeout) as response:
         code = int(response.getcode())
@@ -1721,7 +1721,7 @@ def download_through_http_proxy(
 ) -> tuple[float | None, int, int]:
     proxy_url = f"http://127.0.0.1:{local_port}"
     opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0 MehrdadScaner/1.0"})
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 MehrScanner/1.0"})
     start = time.perf_counter()
     received = 0
     try:
@@ -1752,7 +1752,7 @@ def upload_through_http_proxy(
         data=payload,
         method="POST",
         headers={
-            "User-Agent": "Mozilla/5.0 MehrdadScaner/1.0",
+            "User-Agent": "Mozilla/5.0 MehrScanner/1.0",
             "Content-Type": "application/octet-stream",
         },
     )
@@ -2712,7 +2712,7 @@ def main() -> int:
             should_stop=lambda: stage_stop_requested(args.control_dir, "stage2"),
         )
 
-    print("MehrdadScaner")
+    print("MehrScanner")
     print("-" * 72)
     print(f"Original address : {profile.original_address}:{profile.port}")
     print(f"SNI / Host       : {profile.sni} / {profile.host}")

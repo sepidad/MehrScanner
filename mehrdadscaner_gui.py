@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Windows desktop interface for MehrdadScaner."""
+"""Windows desktop interface for MehrScanner."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class ScannerApp(WINDOW_BASE):
     def __init__(self) -> None:
         super().__init__()
         self.settings = self._load_settings()
-        self.title("MehrdadScaner")
+        self.title("MehrScanner")
         self.minsize(1080, 760)
         self.geometry("1280x860")
         self.process: subprocess.Popen[str] | None = None
@@ -137,7 +137,7 @@ class ScannerApp(WINDOW_BASE):
         header = ttk.Frame(self, padding=(18, 6, 18, 4))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="MehrdadScaner", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text="MehrScanner", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
             header,
             text="Stage 1 finds candidates. Stage 2 validates the tunnel and measures download/upload.",
@@ -376,7 +376,7 @@ class ScannerApp(WINDOW_BASE):
 
     def open_advanced_settings(self) -> None:
         window = tk.Toplevel(self)
-        window.title("MehrdadScaner Advanced Settings")
+        window.title("MehrScanner Advanced Settings")
         window.transient(self)
         window.grab_set()
         window.resizable(True, True)

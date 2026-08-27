@@ -1,6 +1,6 @@
-# MehrdadScaner
+# MehrScanner
 
-MehrdadScaner is a small learning project for carefully testing a small number of candidate IPs for a VLESS-over-TLS profile.
+MehrScanner is a small learning project for carefully testing a small number of candidate IPs for a VLESS-over-TLS profile.
 
 It is written from scratch and intentionally keeps the first version easy to understand. It does not copy the other scanner.
 
