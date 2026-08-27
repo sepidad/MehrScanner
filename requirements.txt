@@ -1,0 +1,2 @@
+# Optional: prettier GUI themes. The app falls back to plain tkinter if absent.
+ttkbootstrap>=1.10

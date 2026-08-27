@@ -1,0 +1,5 @@
+# Put your own candidate IPs or small CIDR ranges here.
+# One item per line. Lines beginning with # are ignored.
+104.20.6.134
+104.16.0.0/30
+172.67.0.0/30

@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+
+# Generated scan output
+out/
+
+# Project-local downloaded Xray-core binary/data
+tools/
+
+# Local/private inputs
+*.local.txt
+*.secret.txt
+private*.txt
+my-config*.txt
+
+# GUI remembers the user's private VLESS URL here
+mehrdadscaner_gui_settings.json
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
