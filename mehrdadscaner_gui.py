@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import ipaddress
 import json
 import os
 import queue
@@ -35,7 +36,7 @@ SCANNER_PATH = PROJECT_DIR / "mehrdadscaner.py"
 OUT_DIR = PROJECT_DIR / "out"
 SCANS_DIR = OUT_DIR / "scans"
 SETTINGS_PATH = PROJECT_DIR / "mehrdadscaner_gui_settings.json"
-DEFAULT_DOWNLOAD_URL = "https://speed.cloudflare.com/__down"
+DEFAULT_DOWNLOAD_URL = "https://speed.cloudflare.com/__down?bytes=100000"
 DEFAULT_UPLOAD_URL = "https://speed.cloudflare.com/__up"
 HIDDEN_PROCESS_FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 NEW_PROCESS_GROUP_FLAG = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -50,6 +51,23 @@ THEMES = [
     "cyborg",
 ]
 DARK_THEMES = {"darkly", "superhero", "vapor", "solar", "cyborg"}
+
+
+def parse_specific_targets(raw: str) -> list[str]:
+    """Validate and normalize comma-separated IPv4 addresses or networks."""
+    targets: list[str] = []
+    for item in raw.split(","):
+        value = item.strip()
+        if not value:
+            continue
+        try:
+            if "/" in value:
+                targets.append(str(ipaddress.IPv4Network(value, strict=False)))
+            else:
+                targets.append(str(ipaddress.IPv4Address(value)))
+        except ValueError as exc:
+            raise ValueError(f"Invalid IPv4 address or CIDR: {value}") from exc
+    return targets
 
 
 class ScannerApp(WINDOW_BASE):
@@ -73,12 +91,13 @@ class ScannerApp(WINDOW_BASE):
         self.theme_name = tk.StringVar(value=self.settings.get("theme", "flatly"))
         self.concurrency = tk.StringVar(value="64")
         self.candidate_limit = tk.StringVar(value="200")
-        self.stop_after_hits = tk.StringVar(value="1000")
+        self.stop_after_hits = tk.StringVar(value="10000")
         self.timeout = tk.StringVar(value="2.5")
         self.neighbor_radius = tk.StringVar(value="1")
-        self.neighbor_limit = tk.StringVar(value="64")
+        self.neighbor_limit = tk.StringVar(value="128")
         self.ports = tk.StringVar()
         self.candidates_path = tk.StringVar()
+        self.specific_targets = tk.StringVar()
         self.seed = tk.StringVar(value="20260522")
         self.delay = tk.StringVar(value="0")
         self.jitter = tk.StringVar(value="0")
@@ -93,7 +112,7 @@ class ScannerApp(WINDOW_BASE):
         self.xray_path = tk.StringVar()
         self.run_stage2 = tk.BooleanVar(value=True)
         self.stage2_during_scan = tk.BooleanVar(value=False)
-        self.stage2_count = tk.StringVar(value="300")
+        self.stage2_count = tk.StringVar(value="3000")
         self.xray_concurrency = tk.StringVar(value="4")
         self.xray_timeout = tk.StringVar(value="10")
         self.test_url = tk.StringVar(value="http://cp.cloudflare.com/generate_204")
@@ -101,7 +120,7 @@ class ScannerApp(WINDOW_BASE):
         self.download_kb = tk.StringVar(value="100")
         self.upload_url = tk.StringVar(value=DEFAULT_UPLOAD_URL)
         self.upload_kb = tk.StringVar(value="50")
-        self.phase1_latency = tk.StringVar(value="1200")
+        self.phase1_latency = tk.StringVar(value="700")
         self.direct_egress = tk.BooleanVar(value=True)
         self.skip_websocket = tk.BooleanVar(value=False)
         self.reuse_clean = tk.BooleanVar(value=True)
@@ -396,6 +415,7 @@ class ScannerApp(WINDOW_BASE):
             [
                 ("Ports (blank = config port)", self.ports),
                 ("Candidate file path", self.candidates_path),
+                ("Specific IPs/CIDRs (comma-separated)", self.specific_targets),
                 ("Random seed", self.seed),
                 ("Neighbor IP limit", self.neighbor_limit),
                 ("Delay seconds", self.delay),
@@ -408,26 +428,26 @@ class ScannerApp(WINDOW_BASE):
             ],
         )
         ttk.Checkbutton(scan_tab, text="Skip WebSocket check", variable=self.skip_websocket).grid(
-            row=11, column=0, columnspan=2, sticky="w", pady=(8, 0)
+            row=12, column=0, columnspan=2, sticky="w", pady=(8, 0)
         )
         ttk.Checkbutton(
             scan_tab,
             text="Use system proxy (V2rayN) for control traffic. UNCHECKED = use pure direct internet",
             variable=self.use_system_proxy,
-        ).grid(row=12, column=0, columnspan=2, sticky="w", pady=3)
+        ).grid(row=13, column=0, columnspan=2, sticky="w", pady=3)
         ttk.Checkbutton(
             scan_tab,
             text="Refuse to scan if TUN/VPN routing is active (recommended)",
             variable=self.check_tun,
-        ).grid(row=16, column=0, columnspan=2, sticky="w", pady=3)
+        ).grid(row=17, column=0, columnspan=2, sticky="w", pady=3)
         ttk.Checkbutton(scan_tab, text="Keep scanning until stopped", variable=self.continuous).grid(
-            row=13, column=0, columnspan=2, sticky="w", pady=3
-        )
-        ttk.Checkbutton(scan_tab, text="Reuse clean IPs from the last run", variable=self.reuse_clean).grid(
             row=14, column=0, columnspan=2, sticky="w", pady=3
         )
-        ttk.Checkbutton(scan_tab, text="Show failed checks in the live log", variable=self.show_failures).grid(
+        ttk.Checkbutton(scan_tab, text="Reuse clean IPs from the last run", variable=self.reuse_clean).grid(
             row=15, column=0, columnspan=2, sticky="w", pady=3
+        )
+        ttk.Checkbutton(scan_tab, text="Show failed checks in the live log", variable=self.show_failures).grid(
+            row=16, column=0, columnspan=2, sticky="w", pady=3
         )
 
         self._add_grid_fields(
@@ -445,6 +465,9 @@ class ScannerApp(WINDOW_BASE):
         self._add_grid_fields(xray_tab, [("Path to xray.exe (blank = automatic)", self.xray_path)])
         ttk.Checkbutton(xray_tab, text="Allow automatic Xray download", variable=self.auto_install_xray).grid(
             row=1, column=0, columnspan=2, sticky="w", pady=(8, 0)
+        )
+        ttk.Button(xray_tab, text="Update Xray Core", command=self.update_xray_core).grid(
+            row=2, column=0, sticky="w", pady=(12, 0)
         )
         ttk.Button(window, text="Close", command=window.destroy).grid(row=1, column=0, sticky="e", padx=12, pady=(0, 12))
 
@@ -553,6 +576,18 @@ class ScannerApp(WINDOW_BASE):
             return
         self._launch_scan(args, f"Scanning into {self.active_output_dir.name}...")
 
+    def update_xray_core(self) -> None:
+        """Download the latest official Xray core without freezing the GUI."""
+        def worker() -> None:
+            try:
+                path = scanner.install_xray(PROJECT_DIR, force=True)
+            except Exception as exc:
+                self.after(0, lambda: messagebox.showerror("Xray update failed", str(exc)))
+                return
+            self.after(0, lambda: messagebox.showinfo("Xray updated", f"Xray core is ready:\n{path}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def rescan_selected_scan(self) -> None:
         if self.process is not None:
             return
@@ -647,6 +682,12 @@ class ScannerApp(WINDOW_BASE):
                 raise ValueError(f"{label} must be between {minimum} and {maximum}.")
             return number
 
+        specific_targets = parse_specific_targets(self.specific_targets.get())
+        if specific_targets and self.candidates_path.get().strip():
+            raise ValueError("Use either Specific IPs/CIDRs or Candidate file path, not both.")
+        neighbor_radius = "0" if specific_targets else str(
+            positive_int(self.neighbor_radius.get(), "Neighbor radius", allow_zero=True)
+        )
         command = [
             str(self._scanner_python()),
             "-u",
@@ -656,7 +697,7 @@ class ScannerApp(WINDOW_BASE):
             "--limit", str(positive_int(self.candidate_limit.get(), "Candidates per batch")),
             "--stop-after-hits", str(positive_int(self.stop_after_hits.get(), "Stop after clean hits")),
             "--timeout", str(positive_float(self.timeout.get(), "Stage 1 timeout")),
-            "--neighbor-radius", str(positive_int(self.neighbor_radius.get(), "Neighbor radius", allow_zero=True)),
+            "--neighbor-radius", neighbor_radius,
             "--neighbor-limit", str(positive_int(self.neighbor_limit.get(), "Neighbor IP limit")),
             "--seed", str(positive_int(self.seed.get(), "Random seed", allow_zero=True)),
             "--delay", str(positive_float_or_zero(self.delay.get(), "Delay seconds")),
@@ -671,7 +712,11 @@ class ScannerApp(WINDOW_BASE):
         ]
         if self.ports.get().strip():
             command.extend(["--ports", self.ports.get().strip()])
-        if self.candidates_path.get().strip():
+        if specific_targets:
+            specific_path = self.active_output_dir / "specific_targets.txt"
+            specific_path.write_text("\n".join(specific_targets) + "\n", encoding="utf-8")
+            command.extend(["--candidates", str(specific_path), "--no-reuse-clean-candidates"])
+        elif self.candidates_path.get().strip():
             command.extend(["--candidates", self.candidates_path.get().strip()])
         if self.config_remark.get().strip():
             command.extend(["--config-remark", self.config_remark.get().strip()])

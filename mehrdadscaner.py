@@ -1500,11 +1500,11 @@ def find_xray(project_dir: Path, xray_path: Path | None) -> Path | None:
     return Path(found) if found else None
 
 
-def install_xray(project_dir: Path) -> Path:
+def install_xray(project_dir: Path, force: bool = False) -> Path:
     target_dir = project_dir / "tools" / "xray"
     target_dir.mkdir(parents=True, exist_ok=True)
     xray_exe = target_dir / "xray.exe"
-    if xray_exe.exists():
+    if xray_exe.exists() and not force:
         return xray_exe
 
     print("Xray not found. Downloading official Xray-core Windows 64-bit release...")
